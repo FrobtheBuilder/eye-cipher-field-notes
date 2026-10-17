@@ -76,9 +76,12 @@ Usage
    guess for. Lines starting with # are comments.
 
    The result is CONSISTENT or IMPOSSIBLE under the model above.
-   IMPORTANT: short cribs are easy to satisfy. CONSISTENT only means something once guesses
-   of the same shape that are wrong (e.g. the same crib with letters shuffled, or real text
-   from a book) come back IMPOSSIBLE. Always run such controls.
+   HOW LONG A CRIB MUST BE (measured, see the report's entry 11): for the eyes (83 cards), any
+   crib covering up to about 21 symbols of each message can be made to fit, however wrong it is.
+   From about 30 symbols per message, most wrong cribs come back IMPOSSIBLE within a minute;
+   from 22 to 29 the solver usually gives no answer in reasonable time. So cover at least the
+   first 30 symbols of every message. IMPOSSIBLE then means no. A crib that is not rejected
+   within ~30 minutes (use --timeout 1800) is worth a closer look, but that isn't proof.
 
 Results so far (fake messages, 2 groups, eye lengths, one key each)
 -------------------------------------------------------------------
@@ -96,6 +99,13 @@ Results so far (fake messages, 2 groups, eye lengths, one key each)
       41 cards, P=30: exact (49 s)
       53 cards, P=40: exact (200 s)
     Wrong plaintext, or 2% of letters changed: UNSAT in under a second.
+
+    Crib-length calibration (wrong but honest-looking cribs; all 9 messages):
+      deck   wrong cribs still fit up to   all wrong cribs rejected from
+       31       5 symbols/message             15-20
+       41      10                             20
+       53      10                             30
+       83      ~21 (the eyes)                 mostly by 30 (4 of 6 within a minute, 2 undecided)
 
 Limitations
 -----------

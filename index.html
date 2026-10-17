@@ -124,7 +124,7 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
   <p class="lede">A plain-English log of an attempt to make progress on Noita's unsolved "eye messages". I'll keep updating this page as results come in.</p>
     <div class="meta">
     <span class="pill open">Puzzle still unsolved</span>
-    <span>Last updated 16 Oct 2026, late night</span>
+    <span>Last updated 17 Oct 2026, early morning</span>
   </div>
 </header>
 
@@ -139,6 +139,7 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
     <li>Messages keep matching symbol-for-symbol after their texts diverge more often than chance (p ≈ 0.01), which is what the shared-shuffle variant predicts.</li>
     <li>Everything that depends on the language of the hidden text also holds for Finnish-like text, not just English (entry 8).</li>
     <li><strong>Correction:</strong> I earlier reported a "real" shortage of repeats at distances 2 and 3. Measured against a fair baseline, it isn't unusual (entry 7).</li>
+    <li><strong>How long a guess must be:</strong> for the eyes, any guess shorter than about 22 symbols per message can be made to fit, however wrong it is. From about 30 symbols per message, most wrong guesses are rejected within a minute (entry 11).</li>
     <li><strong>New tool:</strong> I built a solver that recovers the shuffles of a shared-shuffle cipher when the hidden text is known, and rejects wrong guesses instantly. It works on fake messages with decks of up to 53 cards so far; 83-card runs are in progress (entry 10). It can't read the eyes on its own, but it turns guesses about their text into tests.</li>
   </ul>
 </section>
@@ -314,6 +315,28 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     <p><strong>The big caveat.</strong> Speed grows quickly with deck size: about a minute at 41 cards and 3.5 minutes at 53 (after two speed-ups; 20 minutes without them). Whether 83 cards is practical is what the current runs will show.</p>
     <p><strong>Update:</strong> the solver no longer needs to be told which letters share a shuffle. With two groups it works that out too, and still recovers the exact key on the test decks.</p>
   </article>
+  <article class="entry">
+    <div class="entry-head"><span class="num">11</span><h3>How long does a guess have to be?</h3><span class="pill ok">Measured</span></div>
+    <p>A test that says "consistent" to everything is useless, so I measured where the solver starts rejecting wrong guesses. The wrong guesses were made to look like honest ones. Wherever two messages show identical symbols at the start, the guess uses identical text there, and it changes letters exactly where the messages split. The first symbol of each message gets a digit 1–9, and the rest is ordinary Finnish-like text. I ran these guesses against the real eyes, where every random guess is wrong. I also ran them against fake eye-like messages with a known key, where the true guess must pass.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Deck size</th><th>Wrong guesses still fit up to</th><th>All wrong guesses rejected from</th></tr></thead>
+        <tbody>
+          <tr><td>31 cards (fake)</td><td>5 symbols per message</td><td>about 15–20 (in seconds)</td></tr>
+          <tr><td>41 cards (fake)</td><td>10</td><td>20</td></tr>
+          <tr><td>53 cards (fake)</td><td>10</td><td>30</td></tr>
+          <tr><td>83 cards (the eyes)</td><td>about 21</td><td>mostly by 30: 4 of 6 rejected in under a minute; the other 2 got no answer within 30 minutes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <dl class="kv">
+      <dt>Short guesses</dt><dd>For the eyes' 83-card deck, a guess covering up to about 21 symbols of every message can always be made to fit. I confirmed this directly: a new GPU search finds a fitting key for wrong 21-symbol guesses within seconds. So nobody can test a short guess this way, however good the solver gets.</dd>
+      <dt>Long guesses</dt><dd>From about 30 symbols per message, wrong guesses usually fail within a minute. Because the openings are shared, that's roughly 270 guessed letters in total.</dd>
+      <dt>In between</dt><dd>From 22 to 29 symbols, neither the SAT solver nor the GPU search reaches an answer in reasonable time yet, even for the true guess.</dd>
+      <dt>Practical rule</dt><dd>To test a guess about the eyes, cover at least the first 30 symbols of every message. "Impossible" then means no. A long guess that survives is interesting, but not proof.</dd>
+    </dl>
+    <p><strong>Speed work.</strong> I tried several speed-ups. Re-encoding how the messages share a starting deck made tests about 4× faster. Building guesses up one symbol at a time made wrong guesses fail about 40× faster on small decks. A stricter way to avoid relabeled duplicate answers turned out 2–3× slower, so I dropped it. A GPU search (CUDA, on both machines) finds fitting keys for guesses up to about 21 symbols in seconds, where the SAT solver needed minutes or gave up. Past that point it stalls too, so the middle zone is still open.</p>
+  </article>
 </section>
 
 <section aria-labelledby="dl-h">
@@ -330,7 +353,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     <p>The eye messages are built into the script, so nothing else is needed.</p>
     <p>To test a guess against the real eyes, write one line per message (<span class="mono">E1: YOUR GUESS</span>; the same character means the same hidden letter) and run:</p>
 <pre class="cmd">python xgak_sat.py eyes mycrib.txt</pre>
-    <p>It answers CONSISTENT or IMPOSSIBLE under the shared-shuffle model. Short guesses are easy to satisfy, so a CONSISTENT answer only means something if wrong guesses of the same length come back IMPOSSIBLE. The README describes how to run that check.</p>
+    <p>It answers CONSISTENT or IMPOSSIBLE under the shared-shuffle model. Guesses shorter than about 22 symbols per message always fit (entry 11), so cover at least the first 30 symbols of every message. IMPOSSIBLE then means no. A guess that isn't rejected within about 30 minutes is worth a closer look, but that isn't proof.</p>
   </div>
 </section>
 
@@ -338,8 +361,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
   <h2 id="next-h">What's next</h2>
   <ul>
     <li>Use the in-step stretches to mark which positions hold the <em>same</em> hidden letter across messages, and look for a consistent pattern in where messages fall out of step. That is the first real foothold toward reading the text.</li>
-    <li>Finish the 83-card solver runs, and speed the solver up if needed.</li>
-    <li>Measure on the real eyes how long a guess must be before wrong guesses fail. That sets how much text anyone would have to guess.</li>
+    <li>Close the 22–29-symbol gap: better GPU search (keeping more varied candidate keys alive), or solver strategies that confirm true guesses at that length.</li>
     <li>Feed the solver only what we really know about the eyes' text (shared openings, repeated phrases) and see whether that alone pins the key down. Toy tests of this are running.</li>
     <li>Make a consistent guess decrypt the rest of each message, so a correct guess shows up as readable text.</li>
     <li>Test a "digits share a shuffle" reading of the obstacle: that the two swapped 4-symbol blocks in messages 1 and 2 are 4-digit numbers.</li>

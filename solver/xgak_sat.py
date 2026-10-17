@@ -92,7 +92,8 @@ def make_texts(rnd, lang, A, lens):
     return texts
 
 
-def encode(cts, pts, cls, N, A, K, Dmax, anchor=True, solver='cadical153', prefix=None, symbreak=False, longeq=False, onehot=False):
+def encode(cts, pts, cls, N, A, K, Dmax, anchor=True, solver='cadical153', prefix=None, symbreak=False, longeq=False, onehot=False,
+           anchor_all=False, old_anchor=False):
     """cts/pts: per-message ciphertext symbols and plaintext letter indices (0..A-1, equal index = same letter).
     cls: class of each letter, or None to let the solver choose (K must be 2).  A crib may cover a different
     prefix of each message (ciphertext is cut to the plaintext length); empty messages are skipped."""
@@ -189,14 +190,22 @@ def encode(cts, pts, cls, N, A, K, Dmax, anchor=True, solver='cadical153', prefi
                     if ct[t] == ct[t + d]:
                         getP(t, d)
         Pv.append(P)
-    if anchor:   # positions in the common D0 of the first Dmax+1 cards of every message
+    def chain(m, t, d):
+        """P(t,d) of message m, building the diagonal chain down to the window if needed."""
+        P = Pv[m]
+        if (t, d) in P: return P[(t, d)]
+        ct, pt = cts[m], pts[m]
+        z = vp.new(B); mux(chain(m, t + 1, d - 1), pt[t], z)
+        P[(t, d)] = z
+        if ct[t] == ct[t + d]: eq_const(z, pt[t])
+        else: neq_const(z, pt[t])
+        return z
+    if anchor and old_anchor:   # (old) pairwise equal/different constraints between anchored values
         vals = []
         for m, (ct, pt) in enumerate(zip(cts, pts)):
             vals.append((ct[0], ('c', pt[0])))
             for d in range(1, min(Dmax, len(ct) - 1) + 1):
                 vals.append((ct[d], ('v', Pv[m][(0, d)])))
-        def bitlits(v):
-            return v[1] if v[0] == 'v' else None
         for (x1, v1), (x2, v2) in itertools.combinations(vals, 2):
             if v1[0] == 'c' and v2[0] == 'c':
                 continue
@@ -215,6 +224,35 @@ def encode(cts, pts, cls, N, A, K, Dmax, anchor=True, solver='cadical153', prefi
                     for j in range(B):   # u_j -> b1_j xor b2_j
                         add([-u[j], b1[j], b2[j]]); add([-u[j], -b1[j], -b2[j]])
                     add(u)
+    elif anchor:
+        # All messages start from the same deck D0, so every card x has ONE starting position pos(x), and
+        # different cards have different starting positions (all-different via one-hot + at-most-one per slot).
+        # P(0,d) of each message = pos(card read at step d).
+        vals = []
+        for m, (ct, pt) in enumerate(zip(cts, pts)):
+            vals.append((ct[0], ('c', pt[0])))
+            dm = len(ct) - 1 if anchor_all else min(Dmax, len(ct) - 1)
+            for d in range(1, dm + 1):
+                vals.append((ct[d], ('v', chain(m, 0, d))))
+        cards = sorted(set(x for x, _ in vals))
+        ph, pb = {}, {}
+        for x in cards:
+            ph[x] = vp.new(N); pb[x] = vp.new(B)
+            add(ph[x])
+            for q in range(N):
+                for j in range(B): add([-ph[x][q], pb[x][j] if (q >> j) & 1 else -pb[x][j]])
+                add([ph[x][q]] + [-pb[x][j] if (q >> j) & 1 else pb[x][j] for j in range(B)])
+        for q in range(N):
+            if len(cards) > 1:
+                enc = CardEnc.atmost([ph[x][q] for x in cards], 1, top_id=vp.n, encoding=EncType.seqcounter)
+                for cl in enc.clauses: add(cl)
+                vp.n = max(vp.n, enc.nv)
+        for x, v in vals:
+            if v[0] == 'c':
+                add([ph[x][v[1]]])
+            else:
+                for j in range(B):
+                    add([-v[1][j], pb[x][j]]); add([v[1][j], -pb[x][j]])
     encode.class_vars = cb
     return S, sb, ncl[0], vp.n, B
 
@@ -269,7 +307,8 @@ def run_synth(a):
         pts = [[(x if r2.random() > f else r2.randrange(a.A)) for x in pt] for pt in pts]
     t0 = time.time()
     S, sb, ncl, nv, B = encode(cts, pts, None if a.unknown_classes else key[1], a.N, a.A, a.K, a.dmax,
-                               prefix=a.prefix, symbreak=not a.no_symbreak, longeq=a.long, onehot=a.onehot, solver=a.solver)
+                               prefix=a.prefix, symbreak=not a.no_symbreak, longeq=a.long, onehot=a.onehot, solver=a.solver,
+                               anchor_all=a.anchor_all, old_anchor=a.old_anchor)
     t1 = time.time()
     res = solve(S, a.timeout); t2 = time.time()
     msg = (f'synth N={a.N} A={a.A} K={a.K} dmax={a.dmax} seed={a.seed} lang={a.lang} mode={a.mode} prefix={a.prefix} '
@@ -330,9 +369,10 @@ def run_eyes(a):
         raise SystemExit('without --classes the solver chooses the groups, which needs K=2')
     used = sum(len(p) for p in pts)
     print(f'crib covers {used} symbols in {sum(1 for p in pts if p)} messages; {A} distinct letters; '
-          f'groups {"given" if cls else "chosen by the solver"}; K={a.K}; deck of 83 cards', flush=True)
+          f'groups {"given" if cls else "chosen by the solver"}; K={a.K}; deck of {a.N} cards', flush=True)
     t0 = time.time()
-    S, sb, ncl, nv, B = encode(cts, pts, cls, 83, A, a.K, a.dmax, symbreak=not a.no_symbreak, longeq=a.long, solver=a.solver)
+    S, sb, ncl, nv, B = encode(cts, pts, cls, a.N, A, a.K, a.dmax, symbreak=not a.no_symbreak, longeq=a.long, solver=a.solver,
+                               anchor_all=a.anchor_all, old_anchor=a.old_anchor)
     t1 = time.time()
     res = solve(S, a.timeout); t2 = time.time()
     print(f'encode {t1-t0:.1f}s, solve {t2-t1:.1f}s, {nv} variables, {ncl} clauses', flush=True)
@@ -358,6 +398,8 @@ if __name__ == '__main__':
     common.add_argument('--long', action='store_true', help='also encode every longer-distance repeat (faster on big decks)')
     common.add_argument('--no-symbreak', action='store_true', help='disable symmetry breaking')
     common.add_argument('--timeout', type=float, default=None, help='give up after this many seconds')
+    common.add_argument('--anchor-all', action='store_true', help='tie every crib position to the shared starting deck (stronger, bigger)')
+    common.add_argument('--old-anchor', action='store_true', help='previous pairwise anchoring encoding (for comparison)')
     common.add_argument('--solver', default='cadical153', help='pysat solver name (cadical153, cadical195, glucose4, maplechrono, lingeling, minisat22)')
     sy = sub.add_parser('synth', parents=[common], help='known-plaintext recovery on fake messages (eye lengths)')
     sy.add_argument('N', type=int, help='deck size (83 for the eyes)')
@@ -372,6 +414,7 @@ if __name__ == '__main__':
     ey = sub.add_parser('eyes', parents=[common], help='test a plaintext guess (crib) against the real eye messages')
     ey.add_argument('crib', help='text file with lines "E1: SOMETEXT" (names E1 W1 E2 W2 E3 W3 E4 W4 E5); same character = same letter')
     ey.add_argument('--K', type=int, default=2)
+    ey.add_argument('--N', type=int, default=83, help='deck size (83 for the eyes; smaller only for --ct experiments)')
     ey.add_argument('--classes', default=None, help='letter groups, e.g. "0123456789|ABCDEFG..." (default: solver chooses, K=2)')
     ey.add_argument('--skip-label', action='store_true', help='crib starts at the 2nd symbol (assumes all first letters share a group)')
     ey.add_argument('--ct', default=None, help='use this ciphertext file (eyes_ascii32 format) instead of the real eyes, e.g. for controls')
