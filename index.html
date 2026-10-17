@@ -124,7 +124,7 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
   <p class="lede">A plain-English log of an attempt to make progress on Noita's unsolved "eye messages". I'll keep updating this page as results come in.</p>
     <div class="meta">
     <span class="pill open">Puzzle still unsolved</span>
-    <span>Last updated 17 Oct 2026, early morning</span>
+    <span>Last updated 17 Oct 2026, 3 am</span>
   </div>
 </header>
 
@@ -140,6 +140,7 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
     <li>Everything that depends on the language of the hidden text also holds for Finnish-like text, not just English (entry 8).</li>
     <li><strong>Correction:</strong> I earlier reported a "real" shortage of repeats at distances 2 and 3. Measured against a fair baseline, it isn't unusual (entry 7).</li>
     <li><strong>How long a guess must be:</strong> for the eyes, any guess shorter than about 22 symbols per message can be made to fit, however wrong it is. From about 30 symbols per message, most wrong guesses are rejected within a minute (entry 11).</li>
+    <li><strong>The symbols alone can't settle it:</strong> with the hidden text left free, the model can explain random text as well as the eyes at every length a search can reach. Solving it will need either a long guess or a language model (entry 12).</li>
     <li><strong>New tool:</strong> I built a solver that recovers the shuffles of a shared-shuffle cipher when the hidden text is known, and rejects wrong guesses instantly. It works on fake messages with decks of up to 53 cards so far; 83-card runs are in progress (entry 10). It can't read the eyes on its own, but it turns guesses about their text into tests.</li>
   </ul>
 </section>
@@ -336,6 +337,25 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
       <dt>Practical rule</dt><dd>To test a guess about the eyes, cover at least the first 30 symbols of every message. "Impossible" then means no. A long guess that survives is interesting, but not proof.</dd>
     </dl>
     <p><strong>Speed work.</strong> I tried several speed-ups. Re-encoding how the messages share a starting deck made tests about 4× faster. Building guesses up one symbol at a time made wrong guesses fail about 40× faster on small decks. A stricter way to avoid relabeled duplicate answers turned out 2–3× slower, so I dropped it. A GPU search (CUDA, on both machines) finds fitting keys for guesses up to about 21 symbols in seconds, where the SAT solver needed minutes or gave up. Past that point it stalls too, so the middle zone is still open.</p>
+  </article>
+  <article class="entry">
+    <div class="entry-head"><span class="num">12</span><h3>The ciphertext alone can't confirm or refute the model</h3><span class="pill open">Inconclusive</span></div>
+    <p>An obvious next question: forget guessing. Is there <em>any</em> two-group key and <em>any</em> hidden text that would produce the eyes? If not, the model is dead. If yes, the answer might show us the letter pattern.</p>
+    <p>I let the GPU search choose the letters too, and gave four ciphertexts identical effort. All four share the eyes' openings, lengths and "no doubles" property. The table shows how many symbols per message the search could fully explain:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Ciphertext</th><th>Explained up to</th></tr></thead>
+        <tbody>
+          <tr><td>Fake made with a two-group cipher</td><td>25</td></tr>
+          <tr><td>The eyes</td><td>23</td></tr>
+          <tr><td>Eyes' openings + shuffled remainder</td><td>25</td></tr>
+          <tr><td>Eyes' openings + random remainder</td><td>23</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The eyes look exactly like scrambled or random text here, so the test says nothing. That's not just a weak search. With the letters free, this cipher is flexible enough to explain almost any sequence. Counting information, random text only becomes unexplainable at roughly 65–75 symbols per message, far beyond what any search reaches.</p>
+    <p><strong>What it means:</strong> under this model, the eyes can't be solved from the symbols alone. Something has to constrain the hidden text: a long enough guess (entry 11), or a model of the language, so that the search must also produce plausible text. Combining the GPU search with a language model is the most promising next step, but also the most expensive.</p>
+    <p>Also tried, with no gain: Google's OR-Tools CP-SAT solver (about as fast as the current one), and a decoder that assumes the two shuffles are known. That one can't yet tell true shuffles from random ones, so testing "seeded shuffle" ideas will need more work.</p>
   </article>
 </section>
 
