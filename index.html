@@ -331,7 +331,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     </div>
     <dl class="kv">
       <dt>Short guesses</dt><dd>For the eyes' 83-card deck, a guess covering up to about 21 symbols of every message can always be made to fit. I confirmed this directly: a new GPU search finds a fitting key for wrong 21-symbol guesses within seconds. So nobody can test a short guess this way, however good the solver gets.</dd>
-      <dt>Long guesses</dt><dd>From about 30 symbols per message, wrong guesses usually fail within a minute. Because the openings are shared, that's roughly 270 guessed letters in total.</dd>
+      <dt>Long guesses</dt><dd>From about 30 symbols per message, wrong guesses usually fail within a minute. That's 270 positions, but the shared openings repeat the same text, so only about 160 of them are separate letters to guess. And only the pattern matters (which positions hold the same letter), not which letters they are.</dd>
       <dt>In between</dt><dd>From 22 to 29 symbols, neither the SAT solver nor the GPU search reaches an answer in reasonable time yet, even for the true guess.</dd>
       <dt>Practical rule</dt><dd>To test a guess about the eyes, cover at least the first 30 symbols of every message. "Impossible" then means no. A long guess that survives is interesting, but not proof.</dd>
     </dl>
