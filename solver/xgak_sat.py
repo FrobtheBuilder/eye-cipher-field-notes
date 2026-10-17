@@ -280,15 +280,20 @@ def check_full(sig, cts, pts, cls, N):
 
 
 def solve(S, timeout=None):
-    """Run the solver; True / False.  pysat's CaDiCaL ignores interrupts, so a timeout is a watchdog that
-    ends the whole process with exit code 3."""
-    timer = None
+    """Run the solver; True / False.  pysat's CaDiCaL ignores interrupts and keeps Python's interpreter lock while it
+    runs, so a timer thread never gets to act.  A timeout is therefore a separate watchdog process that prints
+    TIMEOUT and ends this one (exit code 3 on Windows, killed by SIGKILL elsewhere)."""
+    import subprocess
+    dog = None
     if timeout:
-        def kill():
-            print(f'TIMEOUT after {timeout:.0f}s (no answer)', flush=True); os._exit(3)
-        timer = threading.Timer(timeout, kill); timer.daemon = True; timer.start()
-    res = S.solve()
-    if timer: timer.cancel()
+        sig = 3 if os.name == 'nt' else 9
+        code = (f'import os, time; time.sleep({float(timeout)!r}); '
+                f'print("TIMEOUT after {timeout:.0f}s (no answer)", flush=True); os.kill({os.getpid()}, {sig})')
+        dog = subprocess.Popen([sys.executable, '-c', code])
+    try:
+        res = S.solve()
+    finally:
+        if dog is not None and dog.poll() is None: dog.kill()
     return res
 
 

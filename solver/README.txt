@@ -113,6 +113,9 @@ Limitations
   statistics checked in the report, but it is not proven.
 * It assumes distinct read positions (unique decryption) and one shared starting deck.
   Unknown groups are supported for K=2 only.
-* Speed grows quickly with deck size. Whether 83 cards is practical is still being measured.
-* --timeout kills the process, because CaDiCaL ignores interrupts.
+* Speed grows quickly with deck size. At 83 cards, recovering the key from a full known text (letter
+  groups given) took 6.5 hours in one test; rejecting wrong 30-symbol guesses usually takes about a minute.
+* --timeout ends the run from a small separate watchdog process, because CaDiCaL ignores interrupts and
+  blocks Python's other threads while it solves. Fixed 17 Oct 2026: before that, --timeout was silently
+  ignored on long runs. Re-download xgak_sat.py if you rely on it.
 * It does not yet decrypt beyond the crib, or search for cribs itself.

@@ -124,7 +124,7 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
   <p class="lede">A plain-English log of an attempt to make progress on Noita's unsolved "eye messages". I'll keep updating this page as results come in.</p>
     <div class="meta">
     <span class="pill open">Puzzle still unsolved</span>
-    <span>Last updated 17 Oct 2026, 3 am</span>
+    <span>Last updated 17 Oct 2026, morning</span>
   </div>
 </header>
 
@@ -141,7 +141,8 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
     <li><strong>Correction:</strong> I earlier reported a "real" shortage of repeats at distances 2 and 3. Measured against a fair baseline, it isn't unusual (entry 7).</li>
     <li><strong>How long a guess must be:</strong> for the eyes, any guess shorter than about 22 symbols per message can be made to fit, however wrong it is. From about 30 symbols per message, most wrong guesses are rejected within a minute (entry 11).</li>
     <li><strong>The symbols alone can't settle it:</strong> with the hidden text left free, the model can explain random text as well as the eyes at every length a search can reach. Solving it will need either a long guess or a language model (entry 12).</li>
-    <li><strong>New tool:</strong> I built a solver that recovers the shuffles of a shared-shuffle cipher when the hidden text is known, and rejects wrong guesses instantly. It works on fake messages with decks of up to 53 cards so far; 83-card runs are in progress (entry 10). It can't read the eyes on its own, but it turns guesses about their text into tests.</li>
+    <li><strong>A language-guided search falls short:</strong> I made the search produce real Finnish as well as a fitting key, and tested it on fakes where the answer was known. It never recovers the text. The answer only becomes unique at about 37–42 symbols per message, and the search tops out around 22. Even given the whole correct text, the GPU only finds a key for 19 symbols (entry 13).</li>
+    <li><strong>New tool:</strong> I built a solver that recovers the shuffles of a shared-shuffle cipher when the hidden text is known, and rejects wrong guesses instantly. It now also works at the eyes' size of 83 cards, in about 6.5 hours when the letter groups are known (entry 10). It can't read the eyes on its own, but it turns guesses about their text into tests.</li>
   </ul>
 </section>
 
@@ -303,7 +304,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
           <tr><td>41</td><td>10</td><td>about 1 min</td><td>exact</td></tr>
           <tr><td>53</td><td>14</td><td>20 min</td><td>exact</td></tr>
           <tr><td>61</td><td>16</td><td>25 min</td><td>exact</td></tr>
-          <tr><td>83 (eye size)</td><td>22</td><td colspan="2">running; at this growth rate it could take days</td></tr>
+          <tr><td>83 (eye size)</td><td>22</td><td>6.5 hours</td><td>exact</td></tr>
         </tbody>
       </table>
     </div>
@@ -314,6 +315,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     </dl>
     <p><strong>What it can't do yet.</strong> We know none of the eyes' hidden text, so there's nothing to feed it. I also tried giving it only the ciphertext. That works in principle on tiny decks, but at 83 cards repeats are so rare that the ciphertext alone doesn't contain enough clues for this kind of solver without some knowledge of the language. The realistic use is checking guesses: if the eyes are this kind of cipher and someone guesses enough of how the messages begin, the solver can confirm it and read the rest.</p>
     <p><strong>The big caveat.</strong> Speed grows quickly with deck size: about a minute at 41 cards and 3.5 minutes at 53 (after two speed-ups; 20 minutes without them). Whether 83 cards is practical is what the current runs will show.</p>
+    <p><strong>Update (83 cards):</strong> the full-size run finished. Given the whole text and the letter groups, the solver recovered the exact key in 6.5 hours, reproducing all 60,000 checked pairs. So recovering the shuffles of an eye-sized deck from known text works; it is just slow.</p>
     <p><strong>Update:</strong> the solver no longer needs to be told which letters share a shuffle. With two groups it works that out too, and still recovers the exact key on the test decks.</p>
   </article>
   <article class="entry">
@@ -357,6 +359,30 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     <p><strong>What it means:</strong> under this model, the eyes can't be solved from the symbols alone. Something has to constrain the hidden text: a long enough guess (entry 11), or a model of the language, so that the search must also produce plausible text. Combining the GPU search with a language model is the most promising next step, but also the most expensive.</p>
     <p>Also tried, with no gain: Google's OR-Tools CP-SAT solver (about as fast as the current one), and a decoder that assumes the two shuffles are known. That one can't yet tell true shuffles from random ones, so testing "seeded shuffle" ideas will need more work.</p>
   </article>
+  <article class="entry">
+    <div class="entry-head"><span class="num">13</span><h3>A language-guided search: built and tested, but it falls short</h3><span class="pill no">Falls short</span></div>
+    <p>Entry 12 said the symbols alone can't settle anything, because the cipher can explain almost any sequence if the hidden text may be anything. So I made the search produce real language as well as a consistent key.</p>
+    <p><strong>The language model.</strong> I trained letter statistics on 45 public-domain Finnish books from Project Gutenberg (10.6 million letters), plus 25 English books. The model predicts each letter from the four before it. On books it never saw, its average uncertainty is 2.2 bits per letter, about the same as choosing between five letters. Random letters would be about 4.5 bits.</p>
+    <p><strong>The search.</strong> The GPU search from entry 12 now has to find shuffles, letter groups and a hidden text that both fit the symbols and read like the books. I tested it on fakes: nine messages with the eyes' lengths and shared openings, made from Finnish books the model never saw and encrypted with a random two-group key on 83 cards. So the right answer was known. Two checks came first. The right answer scores as a perfect fit at every length, and once the search holds it at 30 or more symbols per message, it keeps it.</p>
+    <p><strong>Results on the 83-card fake.</strong> The search fully explained the first symbols of every message, but never with the right text:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>What the search was given</th><th>Explained up to (symbols per message)</th><th>Hidden letters right</th></tr></thead>
+        <tbody>
+          <tr><td>Only the symbols</td><td>22</td><td>8% (chance)</td></tr>
+          <tr><td>Only the symbols, 8× more effort</td><td>24</td><td>8%</td></tr>
+          <tr><td>The two correct shuffles</td><td>19</td><td>7%</td></tr>
+          <tr><td>The whole correct key (shuffles and where each letter is read)</td><td>16</td><td>17%</td></tr>
+          <tr><td>The whole correct text (so only the key is searched)</td><td>19</td><td>all (given)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Smaller decks tell the same story: a 41-card fake was explained up to 20 symbols, again with chance-level letters. So did a second 83-card fake whose messages continue naturally after their shared openings, and a sharper weighting of the language model.</p>
+    <p><strong>How long the messages must be.</strong> Counting information, with these letter statistics only one answer should fit once the search covers about 37–42 symbols of every message. As a check, the same count says a known text pins the key at about 32 symbols per message. That agrees with entry 11's measurement (about 30).</p>
+    <p><strong>What it means.</strong> The idea is sound in principle: the eyes have 99–137 symbols per message, plenty to single out the answer. But the search can't get anywhere near 40, and the language model isn't the weak link. Even handed the whole correct text, the GPU search can only find a matching key for 19 symbols. The exact solver is no quick fix: given the fake's correct text for the first 20, 25 or 30 symbols of each message, and left to find the letter groups itself, it still hadn't answered after an hour. With the full-length text and the groups given, it took 6.5 hours (entry 10). A working attack would have to find the key and an unknown text together, at about 40 symbols per message. I don't know how to build one. I doubt it's feasible if the shuffles are arbitrary.</p>
+    <p><strong>On the real eyes</strong> the search reaches 20 symbols per message with Finnish and 21 with English, against 22 for random symbols. Like entry 12, that says nothing. The Finnish-looking text it produces is meaningless.</p>
+    <p><strong>Known keys don't help this search either.</strong> Given the whole correct key, it reached 16 symbols per message. Given random shuffles, it sometimes failed within 4 symbols but once reached 17. So this search can't tell a right key from a wrong one. I also wrote a direct decoder that reads the messages off a proposed key. Even with the true key, it lost the right reading after about 12 symbols, about as far as random keys got. The deck's starting order is still unknown, and early on every new card is a free choice, so there are far more fluent wrong readings than it can track. Testing ideas about how the game builds its shuffles therefore needs a better decoder too.</p>
+  </article>
 </section>
 
 <section aria-labelledby="dl-h">
@@ -374,6 +400,7 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     <p>To test a guess against the real eyes, write one line per message (<span class="mono">E1: YOUR GUESS</span>; the same character means the same hidden letter) and run:</p>
 <pre class="cmd">python xgak_sat.py eyes mycrib.txt</pre>
     <p>It answers CONSISTENT or IMPOSSIBLE under the shared-shuffle model. Guesses shorter than about 22 symbols per message always fit (entry 11), so cover at least the first 30 symbols of every message. IMPOSSIBLE then means no. A guess that isn't rejected within about 30 minutes is worth a closer look, but that isn't proof.</p>
+    <p><strong>Fixed 17 Oct:</strong> the <span class="mono">--timeout</span> option was silently ignored on long runs, so a run could go on forever. It now works. Please download the script again if you use it.</p>
   </div>
 </section>
 
@@ -381,8 +408,8 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
   <h2 id="next-h">What's next</h2>
   <ul>
     <li>Use the in-step stretches to mark which positions hold the <em>same</em> hidden letter across messages, and look for a consistent pattern in where messages fall out of step. That is the first real foothold toward reading the text.</li>
-    <li>Close the 22–29-symbol gap: better GPU search (keeping more varied candidate keys alive), or solver strategies that confirm true guesses at that length.</li>
-    <li>Feed the solver only what we really know about the eyes' text (shared openings, repeated phrases) and see whether that alone pins the key down. Toy tests of this are running.</li>
+    <li>Build a decoder that works for proposed keys, so that concrete ideas for how the game builds its shuffles can be tested. My first one fails even with the true key (entry 13). The next try would work out the deck's starting order the way simple substitution ciphers are solved, by improving a full guess step by step. If the shuffles follow a simple rule, counting information says 25–30 symbols per message would settle a candidate.</li>
+    <li>Test long guesses (30+ symbols per message) from the community with the solver. Shorter ones can't be told apart from wrong ones.</li>
     <li>Make a consistent guess decrypt the rest of each message, so a correct guess shows up as readable text.</li>
     <li>Test a "digits share a shuffle" reading of the obstacle: that the two swapped 4-symbol blocks in messages 1 and 2 are 4-digit numbers.</li>
   </ul>
@@ -395,7 +422,8 @@ E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2
     <li>Finding 4 is a statistical argument, not a proof. It holds for both English-like and Finnish-like text (entry 8).</li>
     <li>Findings 5 and 6 are a lead, not a result. The simulations use one particular way of building the shuffles; a different construction could change the numbers.</li>
     <li>Finding 10 is tested only on fake messages built with my version of the shared-shuffle cipher. If the eyes use a different design, the solver won't apply as it stands.</li>
-    <li>I've made and corrected two mistakes so far (the distance-2/3 claim and the self-swap bug). Both are noted where they happened.</li>
+    <li>Finding 13 is about my search, not a proof about the cipher: a stronger search could still succeed. The solid parts are the information count (37–42 symbols per message) and the measurement that the GPU key search stops at 19 symbols even with the true text.</li>
+    <li>I've made and corrected two mistakes so far (the distance-2/3 claim and the self-swap bug). Both are noted where they happened. I also found and fixed a bug in the downloadable solver: its time limit didn't work on long runs (see the download section).</li>
   </ul>
 </section>
 
