@@ -1,0 +1,6 @@
+# Example crib (a made-up guess, only to show the format).
+# One line per message: NAME: text. Same character = same hidden letter; spaces count as letters.
+# Message names: E1 W1 E2 W2 E3 W3 E4 W4 E5. Lines may cover different lengths; missing messages are skipped.
+E1: 1 SEEK THE TRUTH
+W1: 2 SEEK THE TRUTH
+E2: 3 SEEK THE TRUTH

@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eye Cipher Field Notes</title>
+<meta name="description" content="A plain-English running log of an attempt on Noita's unsolved eye-message cipher, with a SAT-based solver for shared-shuffle deck ciphers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one readable column (~68ch) of dated lab-notebook entries, with figures breaking slightly wider. */
+:root {
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --fg: #13191e;
+  --muted: #56616c;
+  --line: #d3dbe1;
+  --accent: #0d7480;      /* iris teal */
+  --accent-soft: #d7eef0;
+  --warn: #9a5a00;        /* in-progress amber */
+  --warn-soft: #f6ead6;
+  --no: #8f2c2c;          /* ruled out */
+  --no-soft: #f4dddd;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --eye-white: #f7f7f2;
+  --eye-ink: #13191e;
+  --display: "Pixelify Sans", "Courier New", monospace;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1216; --surface: #151c22; --fg: #e3e9ee; --muted: #9aa6b1; --line: #2a343d;
+    --accent: #52c2cb; --accent-soft: #15353a; --warn: #e6a64a; --warn-soft: #3a2c16;
+    --no: #ee8a8a; --no-soft: #3a1d1f; --series-1: #3987e5; --series-2: #d95926;
+    --eye-white: #e9ece6; --eye-ink: #0d1216; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1216; --surface: #151c22; --fg: #e3e9ee; --muted: #9aa6b1; --line: #2a343d;
+  --accent: #52c2cb; --accent-soft: #15353a; --warn: #e6a64a; --warn-soft: #3a2c16;
+  --no: #ee8a8a; --no-soft: #3a1d1f; --series-1: #3987e5; --series-2: #d95926;
+  --eye-white: #e9ece6; --eye-ink: #0d1216; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body);
+  font-size: 1.0625rem; line-height: 1.62;
+}
+.wrap {
+  max-width: 46rem; margin: 0 auto;
+  padding-block: 2.5rem 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 2.75rem;
+}
+h1, h2 { font-family: var(--display); font-weight: 700; text-wrap: balance; letter-spacing: 0.01em; margin: 0; }
+h1 { font-size: clamp(2rem, 6vw, 2.9rem); line-height: 1.05; }
+h2 { font-size: 1.45rem; line-height: 1.2; }
+h3 { font-family: var(--body); font-weight: 600; font-size: 1.12rem; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+section { display: grid; gap: 1rem; }
+.label { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+header { display: grid; gap: 0.9rem; }
+.meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; color: var(--muted); font-size: 0.92rem; }
+.pill { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.18rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.pill.open { background: var(--warn-soft); color: var(--warn); }
+.pill.no { background: var(--no-soft); color: var(--no); }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.lede { font-size: 1.15rem; }
+ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; }
+code, .mono { font-family: var(--mono); font-size: 0.9em; }
+.tldr { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.4rem; display: grid; gap: 0.8rem; }
+.entry { display: grid; gap: 0.75rem; padding-top: 1.4rem; border-top: 1px solid var(--line); }
+.entry-head { display: flex; flex-wrap: wrap; gap: 0.5rem 0.8rem; align-items: baseline; }
+.entry-head .num { font-family: var(--display); color: var(--accent); font-size: 1.1rem; }
+.kv { display: grid; grid-template-columns: 9.5rem 1fr; gap: 0.35rem 1rem; font-size: 0.98rem; }
+.kv dt { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 0.2rem; }
+.kv dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { .kv { grid-template-columns: 1fr; } .kv dd { margin-bottom: 0.4rem; } }
+figure { margin: 0; display: grid; gap: 0.6rem; }
+figcaption { color: var(--muted); font-size: 0.9rem; }
+.eyes-fig { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: center; }
+.eyes-fig svg { max-width: 100%; height: auto; }
+.cipherline { font-family: var(--mono); font-size: 0.86rem; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; white-space: pre; line-height: 1.5; }
+.cipherline .hit { background: var(--accent-soft); color: var(--accent); border-radius: 3px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1rem 0.6rem; position: relative; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; font-size: 0.88rem; color: var(--fg); }
+.legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-family: var(--mono); font-size: 0.75rem; padding: 0.35rem 0.5rem; border-radius: 6px; white-space: nowrap; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th { font-family: var(--mono); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.04em; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.9rem; }
+summary { cursor: pointer; font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+.gloss { display: grid; grid-template-columns: 11rem 1fr; gap: 0.5rem 1rem; font-size: 0.97rem; }
+.gloss dt { font-weight: 600; }
+.download { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.4rem; display: grid; gap: 0.8rem; }
+.download .btn { justify-self: start; display: inline-block; font-family: var(--mono); font-size: 0.9rem; font-weight: 600; text-decoration: none;
+  background: var(--accent); color: var(--surface); padding: 0.55rem 0.95rem; border-radius: 8px; }
+.download .btn:hover { filter: brightness(1.08); }
+.moved { background: var(--accent-soft); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.95rem; }
+.download .files { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-family: var(--mono); font-size: 0.82rem; }
+pre.cmd { font-family: var(--mono); font-size: 0.82rem; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.9rem; margin: 0; overflow-x: auto; white-space: pre; }
+.gloss dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { .gloss { grid-template-columns: 1fr; } .gloss dd { margin-bottom: 0.5rem; } }
+footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 0.4rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="label">Running report · Noita eye messages</span>
+  <h1>Eye Cipher Field Notes</h1>
+  <p class="lede">A plain-English log of an attempt to make progress on Noita's unsolved "eye messages". I'll keep updating this page as results come in.</p>
+    <div class="meta">
+    <span class="pill open">Puzzle still unsolved</span>
+    <span>Last updated 16 Oct 2026, late night</span>
+  </div>
+</header>
+
+<section class="tldr" aria-labelledby="tldr-h">
+  <h2 id="tldr-h">The short version</h2>
+  <ul>
+    <li>I have <strong>not</strong> decoded the eyes. Nobody has yet, and I'm not going to claim otherwise.</li>
+    <li>I confirmed the data the community uses is correct. It matches the numbers hard-coded inside the game.</li>
+    <li>I proved that two of the four remaining "families" of cipher the community was considering can't produce the eyes. Before this they were only "probably not".</li>
+    <li>I found a conflict inside the community's leading theory. Two features of the messages pull its main assumption in opposite directions.</li>
+    <li>That conflict points toward a variant someone mentioned briefly on the Discord this week: groups of letters share the same shuffle. In simulations it fits every feature I've checked, which the working assumption doesn't.</li>
+    <li>Messages keep matching symbol-for-symbol after their texts diverge more often than chance (p ≈ 0.01), which is what the shared-shuffle variant predicts.</li>
+    <li>Everything that depends on the language of the hidden text also holds for Finnish-like text, not just English (entry 8).</li>
+    <li><strong>Correction:</strong> I earlier reported a "real" shortage of repeats at distances 2 and 3. Measured against a fair baseline, it isn't unusual (entry 7).</li>
+    <li><strong>New tool:</strong> I built a solver that recovers the shuffles of a shared-shuffle cipher when the hidden text is known, and rejects wrong guesses instantly. It works on fake messages with decks of up to 53 cards so far; 83-card runs are in progress (entry 10). It can't read the eyes on its own, but it turns guesses about their text into tests.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="what-h">
+  <h2 id="what-h">What the eyes are</h2>
+  <p>Hidden in two of Noita's parallel worlds are nine walls covered in glowing eyes. Each eye looks in one of five directions: centre, up, right, down or left. Players worked out years ago that the eyes come in triangles of three, and that each triangle reads as a three-digit number in base 5.</p>
+  <figure class="eyes-fig">
+    <svg viewBox="0 0 250 120" width="250" role="img" aria-label="Three eyes in a triangle looking right, centre and up, read as digits 2, 0, 1 giving the number 51">
+      <g fill="var(--eye-white)" stroke="var(--eye-ink)" stroke-width="2">
+        <ellipse cx="45" cy="35" rx="22" ry="15"/><ellipse cx="105" cy="35" rx="22" ry="15"/><ellipse cx="75" cy="85" rx="22" ry="15"/>
+      </g>
+      <g fill="var(--eye-ink)">
+        <circle cx="54" cy="35" r="7"/>   <!-- right = 2 -->
+        <circle cx="105" cy="35" r="7"/>  <!-- centre = 0 -->
+        <circle cx="75" cy="78" r="7"/>   <!-- up = 1 -->
+      </g>
+      <g font-family="IBM Plex Mono, monospace" font-size="13" fill="var(--muted)" text-anchor="middle">
+        <text x="45" y="12">2</text><text x="105" y="12">0</text><text x="75" y="116">1</text>
+      </g>
+      <g font-family="IBM Plex Mono, monospace" font-size="13" fill="var(--fg)">
+        <text x="150" y="52">2·25 + 0·5 + 1</text>
+        <text x="150" y="74" font-weight="600">= 51</text>
+      </g>
+    </svg>
+    <figcaption>One triangle of eyes read clockwise. Directions map to digits: centre 0, up 1, right 2, down 3, left 4. Every triangle in all nine messages lands between 0 and 82, so there are 83 possible symbols.</figcaption>
+  </figure>
+  <p>That gives nine messages, 1,036 symbols in total, written in an alphabet of 83 symbols. The symbols themselves are almost certainly an encrypted text, not a simple code.</p>
+</section>
+
+<section aria-labelledby="known-h">
+  <h2 id="known-h">What the community already established</h2>
+  <ul>
+    <li><strong>It isn't a simple substitution.</strong> The symbols are spread too evenly. In ordinary text a few letters (like E) dominate; here all 83 symbols turn up about equally often.</li>
+    <li><strong>No symbol ever appears twice in a row.</strong> By chance you'd expect about 12 such pairs. So the cipher seems built to prevent it.</li>
+    <li><strong>The same patterns repeat.</strong> Short stretches recur in different places with different symbols but the same "shape" of repeats. Cryptographers call these <em>isomorphs</em>. They're the strongest clue that the same words were encrypted more than once.</li>
+    <li><strong>The messages come in three groups of three.</strong> Each message starts with a different symbol, then several messages share long identical stretches.</li>
+    <li><strong>Leading theory: a deck of cards.</strong> Imagine 83 numbered cards. Each letter of the hidden text shuffles the deck in its own fixed way, and the card that ends up on top is written down. This explains all the features above. But with 83 cards there are about 10<sup>124</sup> possible shuffles per letter, far too many to try one by one.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="found-h">
+  <h2 id="found-h">What I've found so far</h2>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">1</span><h3>The data is right</h3><span class="pill ok">Confirmed</span></div>
+    <p>I unpacked the game files and checked where the eyes come from. They aren't in the game's scripts; they're built into the program itself as encoded numbers. A research helper decoded those numbers independently and they match the community's transcription exactly. I also re-derived the known statistics (83 symbols, no doubled symbols, the evenness of the distribution) and got the published values.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">2</span><h3>"Draw a card and put it on top" doesn't work</h3><span class="pill no">Ruled out</span></div>
+    <p>One of the simplest deck ciphers a programmer might write: each letter means "take the card at position <em>k</em> and move it to the top" (or to the bottom). For these designs you can work backwards from the symbols without knowing the key. If the eyes used one, the recovered positions would cluster into an alphabet-sized set of about 26–40 values. They don't. They spread over 59 different values, exactly like random noise.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">3</span><h3>The two "clock arithmetic" cipher families are impossible</h3><span class="pill no">Ruled out</span></div>
+    <p>Because 83 is a prime number, mathematicians can list every possible "shape" a cipher like this can have. There are only six. The community had already eliminated the two smallest. Two more, built on multiplication and addition on a clock face with 83 hours (their names are <span class="mono">AGL(1,83)</span> and <span class="mono">C83:C41</span>), were only marked "tentatively ruled out", with a note saying "TODO: why?".</p>
+    <p>These two families have a rigid property: once you know where two symbols go, you know where every symbol goes. So I turned the repeated patterns in messages 5, 7, 8 and 9 into a large system of equations and had a computer check every possibility exhaustively. There is no solution.</p>
+    <dl class="kv">
+      <dt>How strong</dt><dd>It still holds if I throw away any one or any two of the nine repeated patterns I used (46 variations), and if I trim five symbols off both ends of every pattern. For the smaller family, a single repeated phrase in messages 7, 8 and 9 is enough on its own.</dd>
+      <dt>Sanity check</dt><dd>I encrypted fake messages with a real cipher from this family and ran the same test. It correctly said "possible" and even recovered the hidden key. On ordinary deck ciphers it correctly said "impossible".</dd>
+      <dt>What's left</dt><dd>Only the two "full deck" families remain: all possible shuffles, and the even-numbered half of them. That confirms what the community suspected, now with a checkable proof.</dd>
+    </dl>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">4</span><h3>The "nearly identical shuffles" idea is under strain</h3><span class="pill open">New tension</span></div>
+    <p>The community's best guess is that every letter's shuffle is almost the same: one shared base shuffle plus a handful of card swaps. That's needed to explain spots where two messages disagree for a few symbols and then match again. The clearest example, the "funny-looking obstacle" in messages 1 and 2, goes 4 different, 4 same, 4 different, then 13 the same.</p>
+    <p>I simulated thousands of such ciphers on ordinary English text and measured two things.</p>
+    <ul>
+      <li><strong>Does the obstacle show up naturally?</strong> Only when shuffles differ by about one swap. With four or more swaps it essentially never happens.</li>
+      <li><strong>Do the repeats look like the eyes?</strong> In the eyes, how often a symbol comes back after 2, 3, 4… positions is fairly even. When shuffles are nearly identical, most of the deck moves the same way every time. Cards then come back at a few favourite distances, giving a spiky pattern the eyes don't have. That spikiness only fades at around twelve or more swaps.</li>
+    </ul>
+    <figure class="chart" id="tradeoff">
+      <div class="legend" aria-hidden="true">
+        <span><i style="background: var(--series-1)"></i>Repeats look as even as the eyes</span>
+        <span><i style="background: var(--series-2)"></i>Two messages re-sync after a 4-letter swap</span>
+      </div>
+      <svg viewBox="0 0 640 300" role="img" aria-labelledby="tradeoff-title" id="tradeoff-svg">
+        <title id="tradeoff-title">As the number of swaps per letter grows, the chance of an eye-like even repeat pattern rises from about 2% to 62%, while the chance of the re-sync seen in messages 1 and 2 falls from 59% to 0%.</title>
+      </svg>
+      <figcaption>Each point is a fraction of simulated ciphers (60 random ciphers × 40 text pairs per point). The two requirements pull in opposite directions; no number of swaps makes both likely. The stricter test, including the 13-symbol re-sync, is in the table.</figcaption>
+    </figure>
+    <details>
+      <summary>Show the numbers</summary>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Swaps per letter</th><th>Even repeats</th><th>Middle 4 match</th><th>Full obstacle (4 + 13 match)</th></tr></thead>
+          <tbody id="tradeoff-table"></tbody>
+        </table>
+      </div>
+    </details>
+    <p>So either the obstacle has some other explanation, or the shuffles are related in a different way than "base plus a few swaps".</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">5</span><h3>Lead: some letters may share a shuffle</h3><span class="pill open">In progress</span></div>
+    <p>There's a variant that removes the conflict. Suppose letters are sorted into a few groups, and every letter in a group shuffles the deck the same way, differing only in which card it reads. Then swapping two words whose letters fall in the same groups leaves the deck exactly in sync. That explains the obstacle and the shared message openings. The shuffles themselves can still be thorough, which keeps the repeats even. The idea is called <em>XGAK</em> in the community's notes and was raised briefly on the Discord on 13 October. The community had set it aside as unnecessary.</p>
+    <p>A hint from the data: messages often keep matching symbol-for-symbol long after their texts have parted ways. That shouldn't happen if the decks had drifted apart. For example, messages W2, E3, E4, W4 and E5 all show the same symbol at position 20, even though W2 split from the others at position 6:</p>
+    <div class="cipherline" aria-label="Positions 0 to 24 of five messages with matching symbol at position 20 highlighted">W2  lb%QkVeN@!J\:PRp@8W]<span class="hit">O</span>,<span class="hit">5</span>,Q
+E3  _b%QkV"\=HnO\kcg\"a'<span class="hit">O</span>.Mj[I
+E4  ;b%QkV"\=H"W)/[2d#D%<span class="hit">O</span>mLF!2
+W4  mb%QkV"\=H"W)/[2d#D%<span class="hit">O</span>\<span class="hit">5</span>p!h
+E5  Ab%QkV"\=H"W)/[2d#D%<span class="hit">O</span>A<span class="hit">5</span>[L2</div>
+    <p>Pooled over all message pairs, symbols match at the same position 4–6 times more often than chance in the 25 positions after the texts diverge. Then the excess fades.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">6</span><h3>The shared-shuffle variant fits everything I've checked</h3><span class="pill ok">Supported</span></div>
+    <p>I simulated the shared-shuffle variant the same way as entry 4. Letters fall into a few groups and each group has one thorough shuffle. The only extra rule is that a card that has just been read is never in a reading spot on the next step, so the same symbol can't come out twice in a row. (My first version used a stricter rule, a fixed "reading area" that read cards are pushed out of. That made cards come back two steps later too often. This looser rule fixes that.)</p>
+    <dl class="kv">
+      <dt>Even repeats</dt><dd>92–100% of simulated ciphers look as even as the eyes once there are two or more letter groups. The "few swaps" models managed 2–8% at swap counts that also allow the obstacle.</dd>
+      <dt>Repeats 2 apart</dt><dd>The eyes have only 5. The model gives that few in 7–11% of simulated ciphers, so it's not a problem.</dd>
+      <dt>No doubles</dt><dd>Never, by construction, matching the eyes.</dd>
+      <dt>The obstacle</dt><dd>Two messages fall perfectly back into step whenever the swapped words use letters from the same groups. With letters split randomly into groups, about 10% of random word pairs do with 2 groups, about 3% with 3, and 1% or less with 4 or more. So the obstacle favours very few groups, or groups with a meaning (for example "all digits", which would make any two 4-digit numbers interchangeable). In the "few swaps" models, a 4-letter swap followed by 13 matching symbols essentially never happened. <em>(Fixed a bug here: my first run sometimes "swapped" a word with itself, which inflated these rates.)</em></dd>
+      <dt>Late matches</dt><dd>When two messages' decks stay in step, a matching symbol simply means the same hidden letter. I tested the late matches against a fair "decks have drifted apart" baseline. Leaving out the two famous cases (the obstacle and the "stutter" in messages 7 and 9), there are 35 matches where about 12 are expected (p ≈ 0.01). With them included it's far beyond chance.</dd>
+    </dl>
+    <p>This doesn't prove the shared-shuffle variant is right, but on every test so far it beats the community's working assumption. If it holds, it's useful: a matching symbol in two in-step messages means "same hidden letter here", and the number of unknown shuffles drops from one per letter to one per group.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">7</span><h3>Three smaller checks on the repeat pattern</h3><span class="pill open">One corrected</span></div>
+    <ul>
+      <li><strong>No hidden rhythm.</strong> The repeat counts at distances 4, 9, 13 and 17 looked like they might recur every ~4.3 steps, which would hint at a conveyor-belt shuffle. A proper test says that's within chance (p ≈ 0.11).</li>
+      <li><strong>The famous excess at distance 4 is text, not mechanism.</strong> 15 of the 23 cases come from four words, each repeated three to five times, that happen to contain a distance-4 repeat. Counting each repeated word once leaves 12 cases where chance predicts about 14.</li>
+      <li><strong>Correction: the shortfall at distances 2 and 3 is not unusual.</strong> Symbols come back two or three positions later only about half as often as pure chance would give (13 cases where about 28 are expected). I first called that significant (p ≈ 0.001). But I had compared against random noise, and a deck cipher doesn't behave like noise here. Whether a card comes back after two steps depends only on the two letters in between. So the count hinges on a handful of letter pairs and swings a lot from key to key. Simulating real deck ciphers on real text, a shortfall this big turns up 12–26% of the time in English and 13–18% in Finnish. There is nothing special to explain.</li>
+    </ul>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">8</span><h3>Finnish-like text gives the same answers</h3><span class="pill ok">Checked</span></div>
+    <p>Several results above rest on simulations, and the simulations need some stand-in for the hidden text. I'd only used English. The developers are Finnish (the enemies have Finnish names), and Finnish looks quite different on paper. It uses fewer letters (no B, C, F, Q, W, X or Z in ordinary words), has ä and ö, and has more than twice as many doubled letters as English ("kk", "aa", "ll"…).</p>
+    <p>The game ships no Finnish translation to borrow from, so I wrote about 25 KB of ordinary Finnish prose (folk-tale and everyday text) and reran every language-dependent test. I tried three versions: with ä and ö, with them folded to a and o (as a programmer might do), and with spaces removed.</p>
+    <dl class="kv">
+      <dt>Few-swaps conflict (entry 4)</dt><dd>Same picture. The chance of both the even repeats and the obstacle is at most 0.004% in Finnish (0.05% in English).</dd>
+      <dt>Shared shuffles (entry 6)</dt><dd>Same picture. Even repeats 95%, obstacle recreated about 10% of the time with 2 letter groups.</dd>
+      <dt>Distance-2/3 check (entry 7)</dt><dd>Same conclusion: not unusual (13–18%).</dd>
+    </dl>
+    <p>Caveat: 25 KB is a small sample of one writing style. It captures the letter mix and doubled letters, which is what drives these tests, but a real Finnish book would be a better check.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">9</span><h3>"One shuffle for every letter" is ruled out</h3><span class="pill no">Ruled out</span></div>
+    <p>The extreme version of shared shuffles has a single group: every letter moves the deck the same way and only picks a different card. Then the deck depends only on how far into the message you are, never on the text. Two messages would hold the same deck at every position. Wherever their hidden letters happened to agree they would show the same symbol, about 7% of the time for English or Finnish.</p>
+    <p>In the eyes, once two messages have been apart for 30 or more positions, they match at the same spot 35 times out of 2,531 (1.4%). Pure chance gives 1.2%. So the deck's movement must depend on the text, and there must be at least two groups.</p>
+  </article>
+
+  <article class="entry">
+    <div class="entry-head"><span class="num">10</span><h3>A solver that recovers the shuffles from known text</h3><span class="pill open">Working on fakes</span></div>
+    <p>The community's notes say nobody has a method for recovering the shuffles of a deck cipher, even with the hidden text in hand. For the shared-shuffle variant I now have one, at least on fake messages.</p>
+    <p><strong>The trick.</strong> Whether two symbols in a message match depends only on the hidden letters <em>between</em> them, not on the state of the deck before. So the messages break into thousands of small, overlapping logic puzzles: "these letters, applied in this order, must bring this card back to a reading spot". An off-the-shelf logic solver (a SAT solver) can chew through puzzles like that.</p>
+    <p><strong>The test.</strong> I encrypted nine fake messages, the same lengths as the eyes and starting from the same deck, with two letter groups and random shuffles. Then I gave the solver the ciphertext plus the hidden text and asked it for the shuffles. I counted it a success only if the recovered shuffles reproduce every match and non-match between symbols in the full messages (about 60,000 pairs), including far beyond what the solver was shown.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Deck size (cards)</th><th>Letters</th><th>Time to solve</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>17</td><td>6</td><td>under 1 s</td><td>exact</td></tr>
+          <tr><td>23</td><td>6</td><td>3–15 s</td><td>exact</td></tr>
+          <tr><td>31</td><td>8</td><td>49 s</td><td>exact</td></tr>
+          <tr><td>41</td><td>10</td><td>about 1 min</td><td>exact</td></tr>
+          <tr><td>53</td><td>14</td><td>20 min</td><td>exact</td></tr>
+          <tr><td>61</td><td>16</td><td>25 min</td><td>exact</td></tr>
+          <tr><td>83 (eye size)</td><td>22</td><td colspan="2">running; at this growth rate it could take days</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <dl class="kv">
+      <dt>Less text needed than you'd think</dt><dd>On the 23-card deck, knowing only the first 20 letters of each message was enough to recover shuffles that decrypt everything after them.</dd>
+      <dt>Wrong guesses fail fast</dt><dd>Given a wrong text, or the right text with just 2% of its letters changed, the solver reports "impossible" in under a second.</dd>
+      <dt>It only needs the pattern</dt><dd>The solver doesn't need actual letters, only which positions share a letter and which group each letter is in. So a guess like "these two words are the same" can be tested without knowing the language.</dd>
+    </dl>
+    <p><strong>What it can't do yet.</strong> We know none of the eyes' hidden text, so there's nothing to feed it. I also tried giving it only the ciphertext. That works in principle on tiny decks, but at 83 cards repeats are so rare that the ciphertext alone doesn't contain enough clues for this kind of solver without some knowledge of the language. The realistic use is checking guesses: if the eyes are this kind of cipher and someone guesses enough of how the messages begin, the solver can confirm it and read the rest.</p>
+    <p><strong>The big caveat.</strong> Speed grows quickly with deck size: about a minute at 41 cards and 3.5 minutes at 53 (after two speed-ups; 20 minutes without them). Whether 83 cards is practical is what the current runs will show.</p>
+    <p><strong>Update:</strong> the solver no longer needs to be told which letters share a shuffle. With two groups it works that out too, and still recovers the exact key on the test decks.</p>
+  </article>
+</section>
+
+<section aria-labelledby="dl-h">
+  <h2 id="dl-h">Download the solver</h2>
+  <div class="download">
+    <p>Research code, written by an AI (Claude) and tested only on fake messages. It needs Python 3.9+ and <span class="mono">pip install python-sat</span>. The README explains the cipher model, the options and the caveats.</p>
+    <a class="btn" href="solver/xgak_sat.py" download>Download xgak_sat.py (single file, 48 KB)</a>
+    <div class="files" aria-label="Other files">
+      <a href="solver/README.txt" target="_blank" rel="noopener">README.txt</a>
+      <a href="solver/crib_example.txt" target="_blank" rel="noopener">crib_example.txt</a>
+      <a href="solver/eyes_ascii32.txt" target="_blank" rel="noopener">eyes_ascii32.txt</a>
+      <a href="https://github.com/FrobtheBuilder/eye-cipher-field-notes" target="_blank" rel="noopener">GitHub repository</a>
+    </div>
+    <p>The eye messages are built into the script, so nothing else is needed.</p>
+    <p>To test a guess against the real eyes, write one line per message (<span class="mono">E1: YOUR GUESS</span>; the same character means the same hidden letter) and run:</p>
+<pre class="cmd">python xgak_sat.py eyes mycrib.txt</pre>
+    <p>It answers CONSISTENT or IMPOSSIBLE under the shared-shuffle model. Short guesses are easy to satisfy, so a CONSISTENT answer only means something if wrong guesses of the same length come back IMPOSSIBLE. The README describes how to run that check.</p>
+  </div>
+</section>
+
+<section aria-labelledby="next-h">
+  <h2 id="next-h">What's next</h2>
+  <ul>
+    <li>Use the in-step stretches to mark which positions hold the <em>same</em> hidden letter across messages, and look for a consistent pattern in where messages fall out of step. That is the first real foothold toward reading the text.</li>
+    <li>Finish the 83-card solver runs, and speed the solver up if needed.</li>
+    <li>Measure on the real eyes how long a guess must be before wrong guesses fail. That sets how much text anyone would have to guess.</li>
+    <li>Feed the solver only what we really know about the eyes' text (shared openings, repeated phrases) and see whether that alone pins the key down. Toy tests of this are running.</li>
+    <li>Make a consistent guess decrypt the rest of each message, so a correct guess shows up as readable text.</li>
+    <li>Test a "digits share a shuffle" reading of the obstacle: that the two swapped 4-symbol blocks in messages 1 and 2 are 4-digit numbers.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="sure-h">
+  <h2 id="sure-h">How sure am I?</h2>
+  <ul>
+    <li>Finding 3 is a proof, but it rests on one assumption: that the repeated patterns I used really are the same words encrypted twice. The repeats are very unlikely to be accidental, and the result survives dropping any two of them.</li>
+    <li>Finding 4 is a statistical argument, not a proof. It holds for both English-like and Finnish-like text (entry 8).</li>
+    <li>Findings 5 and 6 are a lead, not a result. The simulations use one particular way of building the shuffles; a different construction could change the numbers.</li>
+    <li>Finding 10 is tested only on fake messages built with my version of the shared-shuffle cipher. If the eyes use a different design, the solver won't apply as it stands.</li>
+    <li>I've made and corrected two mistakes so far (the distance-2/3 claim and the self-swap bug). Both are noted where they happened.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="gloss-h">
+  <h2 id="gloss-h">Words used here</h2>
+  <dl class="gloss">
+    <dt>Ciphertext / plaintext</dt><dd>The scrambled symbols we can see, and the hidden message they encode.</dd>
+    <dt>Isomorph</dt><dd>Two stretches with different symbols but the same pattern of repeats, like "ABCA" and "XYZX". In this kind of cipher it means the same words were encrypted twice.</dd>
+    <dt>Deck cipher</dt><dd>The leading theory. The hidden state is an 83-card deck, each letter applies a fixed shuffle, and the top card is the output.</dd>
+    <dt>Swap</dt><dd>Exchanging two cards. "Base shuffle plus four swaps" means each letter's shuffle differs from a shared one by four card exchanges.</dd>
+    <dt>XGAK</dt><dd>A broader deck cipher where a letter may read a card other than the top one, so several letters can share one shuffle.</dd>
+    <dt>SAT solver</dt><dd>A general-purpose program that finds settings satisfying a huge list of yes/no rules, or proves none exist. Here the rules say "this card must or must not come back to a reading spot".</dd>
+    <dt>Known-plaintext attack</dt><dd>Recovering the key when you have both the hidden text and the scrambled version. Weaker than reading a message cold, but the first step toward it.</dd>
+  </dl>
+</section>
+
+<footer>
+  <p>Sources: the game files (Steam build, master branch), Lymm's eye-messages wiki on GitHub, the Noita Discord's silmä channels, and the community's documents linked from them.</p>
+  <p>The solver is published in the <a href="https://github.com/FrobtheBuilder/eye-cipher-field-notes" target="_blank" rel="noopener">GitHub repository</a> for this page. The other analysis scripts behind these entries aren't published yet.</p>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var data = [
+    { t: 1, flat: 0.017, mid: 0.590, obs: 0.0271 },
+    { t: 2, flat: 0.000, mid: 0.285, obs: 0.0013 },
+    { t: 3, flat: 0.017, mid: 0.142, obs: 0.0004 },
+    { t: 4, flat: 0.033, mid: 0.074, obs: 0.0000 },
+    { t: 6, flat: 0.083, mid: 0.027, obs: 0.0000 },
+    { t: 8, flat: 0.233, mid: 0.008, obs: 0.0000 },
+    { t: 12, flat: 0.467, mid: 0.001, obs: 0.0000 },
+    { t: 20, flat: 0.617, mid: 0.000, obs: 0.0000 }
+  ];
+  var tb = document.getElementById('tradeoff-table');
+  data.forEach(function (d) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + d.t + '</td><td>' + Math.round(d.flat * 100) + '%</td><td>' + Math.round(d.mid * 100) + '%</td><td>' + (d.obs * 100).toFixed(2) + '%</td>';
+    tb.appendChild(tr);
+  });
+  var svg = document.getElementById('tradeoff-svg');
+  var NS = 'http://www.w3.org/2000/svg';
+  var W = 640, H = 300, L = 48, R = 24, T = 14, B = 44;
+  var xs = data.map(function (d) { return d.t; });
+  // x positions: evenly spaced categories (swap counts are not evenly spaced)
+  function x(i) { return L + i * (W - L - R) / (data.length - 1); }
+  function y(v) { return T + (1 - v / 0.7) * (H - T - B); }
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(e); return e;
+  }
+  [0, 0.2, 0.4, 0.6].forEach(function (v) {
+    el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 });
+    var t = el('text', { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--muted)', 'font-family': 'IBM Plex Mono, monospace' });
+    t.textContent = Math.round(v * 100) + '%';
+  });
+  data.forEach(function (d, i) {
+    var t = el('text', { x: x(i), y: H - B + 20, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)', 'font-family': 'IBM Plex Mono, monospace' });
+    t.textContent = d.t;
+  });
+  var xl = el('text', { x: (L + W - R) / 2, y: H - 6, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)', 'font-family': 'IBM Plex Mono, monospace' });
+  xl.textContent = 'card swaps per letter';
+  [['flat', 'var(--series-1)'], ['mid', 'var(--series-2)']].forEach(function (s) {
+    var dstr = data.map(function (d, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(d[s[0]]); }).join(' ');
+    el('path', { d: dstr, fill: 'none', stroke: s[1], 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+    data.forEach(function (d, i) {
+      el('circle', { cx: x(i), cy: y(d[s[0]]), r: 4, fill: s[1], stroke: 'var(--surface)', 'stroke-width': 2 });
+    });
+  });
+  // direct labels at the line ends
+  var lf = el('text', { x: x(data.length - 1) - 6, y: y(0.617) - 10, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--fg)', 'font-family': 'Literata, Georgia, serif' });
+  lf.textContent = 'even repeats';
+  var lm = el('text', { x: x(0) + 8, y: y(0.59) - 8, 'font-size': 12, fill: 'var(--fg)', 'font-family': 'Literata, Georgia, serif' });
+  lm.textContent = 'obstacle re-sync';
+  // hover layer
+  var chart = document.getElementById('tradeoff');
+  var tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; chart.appendChild(tip);
+  var guide = el('line', { x1: 0, x2: 0, y1: T, y2: H - B, stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' });
+  data.forEach(function (d, i) {
+    var hit = el('rect', { x: x(i) - (W - L - R) / (2 * (data.length - 1)), y: T, width: (W - L - R) / (data.length - 1), height: H - T - B, fill: 'transparent' });
+    function show() {
+      guide.setAttribute('x1', x(i)); guide.setAttribute('x2', x(i)); guide.setAttribute('visibility', 'visible');
+      tip.textContent = d.t + ' swaps · even repeats ' + Math.round(d.flat * 100) + '% · re-sync ' + Math.round(d.mid * 100) + '%';
+      tip.hidden = false;
+      var box = svg.getBoundingClientRect(), cbox = chart.getBoundingClientRect();
+      var px = box.left - cbox.left + x(i) / W * box.width;
+      tip.style.left = Math.max(4, Math.min(px - tip.offsetWidth / 2, cbox.width - tip.offsetWidth - 4)) + 'px';
+      tip.style.top = (box.top - cbox.top + 4) + 'px';
+    }
+    function hide() { guide.setAttribute('visibility', 'hidden'); tip.hidden = true; }
+    hit.addEventListener('mouseenter', show); hit.addEventListener('mouseleave', hide);
+    hit.addEventListener('touchstart', show, { passive: true });
+  });
+})();
+</script>
+</body>
+</html>
